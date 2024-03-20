@@ -1,0 +1,296 @@
+﻿@page "/signup"
+@using System.Net
+@using System.Security.Cryptography
+@inject Container container
+@inject IJSRuntime JS
+@inject NavigationManager NM
+@rendermode InteractiveServer
+
+<style>
+    body {
+        background-color: #1550A7;
+        margin: 0;
+        padding: 0;
+        color: white;
+    }
+
+    .title-line {
+        font-size: 2rem;
+        line-height: 1.1;
+    }
+
+    .footer {
+        margin-top: -10px;
+        text-align: justify;
+        text-justify: inter-word;
+    }
+
+    .responsive-table-container {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        margin-top: 20px;
+    }
+
+        .responsive-table-container table {
+            max-width: 720px;
+            width: 100%;
+            margin: auto;
+            border-collapse: separate;
+            border-spacing: 10px 0;
+            border: none;
+        }
+
+        .responsive-table-container td {
+            padding: 0 0 10px 0;
+            border: none;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .responsive-table-container img {
+            width: 100%;
+            height: auto;
+            max-width: 133px;
+            max-height: 200px;
+        }
+
+        .responsive-table-container input[type="checkbox"] {
+            margin: 0 auto;
+            display: block;
+        }
+
+        .responsive-table-container label {
+            text-align: center;
+            display: block;
+            margin-top: 5px;
+        }
+
+    .form-row {
+        display: flex;
+        width: 100%;
+        gap: 10px;
+        padding: 0 0 10px 0;
+    }
+
+        .form-row input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+    .checkbox-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+    }
+
+        .checkbox-container input[type="checkbox"],
+        .checkbox-container label {
+            margin: 0;
+            display: inline-block;
+        }
+</style>
+<div class="responsive-table-container">
+    <table>
+        <tr>
+            <td colspan="5">
+                <span class="title-line">For Humanity Podcast</span>
+                <br />
+                <span class="title-line">AI-Safety Book Giveaway</span>
+            </td>
+        </tr>
+        <tr>
+            <td><img src="images/HumanCompatible.jpg" /></td>
+            <td><img src="images/Superintelligence.png" /></td>
+            <td><img src="images/TheAlignmentProblem.jpg" /></td>
+            <td><img src="images/ThePrecipise.jpg" /></td>
+            <td><img src="images/Uncontrollable.png" /></td>
+        </tr>
+        <tr>
+            <td colspan="5">
+                <EditForm Model="@entrant">
+                    <div class="form-row">
+                        <InputText @bind-Value="@entrant.FirstName" placeholder="First Name" />
+                        <InputText @bind-Value="@entrant.LastName" placeholder="Last Name" />
+                    </div>
+                    <div class="form-row">
+                        <InputText autocapitalize="none" @bind-Value="@entrant.Email" placeholder="Email" />
+                    </div>
+                </EditForm>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="5">
+                <div class="footer">
+                    Winner(s) will be randomly selected from the set of in-person attendees
+                    who signed up for the giveaway through this site. Attendee data will never
+                    be shared with third parties.  One prize per attendee, max.
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="5">
+                <div class="checkbox-container">
+                    <InputCheckbox @bind-Value="@entrant.WantsEmails" id="periodicEmails" />
+                    &nbsp;
+                    <label for="periodicEmails">I want "For Humanity Podcast" emails</label>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="5">
+                <button @onclick="HandleSubmitAsync">Submit</button>
+                &nbsp;
+                <button @onclick="GoToPodcast">Go To Podcast</button>
+            </td>
+        </tr>
+    </table>
+</div>
+
+@code {
+    private Entrant entrant = new Entrant();
+
+    private bool IsNameInput(string value)
+    {
+        char[] extraChars = ['-', ' '];
+
+        return value.IsNonNullAndTrimmed()
+            && value.Length >= 2
+            && value.All(c => char.IsAsciiLetter(c) || extraChars.Contains(c))
+            && !extraChars.Contains(value[0])
+            && !extraChars.Contains(value[^1]);
+    }
+
+    private void GoToPodcast() =>
+        NM.NavigateTo("https://www.youtube.com/watch?v=wFXYQzeftyQ", forceLoad: true);
+
+    private async Task HandleSubmitAsync()
+    {
+        async Task<bool> NameIsValid(string value, string name)
+        {
+            if (IsNameInput(value))
+                return true;
+
+            await JS.InvokeVoidAsync("alert",
+                $"A valid \"{name}\" must be supplied (3 to 25 characters, initial caps, trimmed)");
+
+            return false;
+        }
+
+        if (!await NameIsValid(entrant.FirstName!, "First Name"))
+            return;
+
+        if (!await NameIsValid(entrant.LastName!, "Last Name"))
+            return;
+
+        if (!Email.IsInput(entrant.Email!))
+        {
+            await JS.InvokeVoidAsync("alert", "A valid \"Email\" must be supplied.");
+
+            return;
+        }
+
+        try
+        {
+            var date = DateOnly.FromDateTime(DateTime.Today);
+
+            var partitionKey = new PartitionKey(date.ToDateString());
+
+            var id = CryptoHelper.GetSha256Hash(
+                entrant.Email + date.ToDateString());
+
+            var original = await GetDataOrNullAsync(id, date);
+
+            var data = new Data()
+                {
+                    Date = date,
+                    FirstName = entrant.FirstName,
+                    LastName = entrant.LastName,
+                    WantsEmails = entrant.WantsEmails,
+                    Id = id
+                };
+
+            ItemResponse<Data> response;
+
+            if (original != null)
+            {
+                data.Email = original.Email;
+                data.Won = original.Date == date ? original.Won : false;
+
+                response = await container.UpsertItemAsync(data, partitionKey);
+            }
+            else
+            {
+                data.Email = entrant.Email!.ToLower();
+                data.Id = id;
+
+                response = await container.CreateItemAsync(data, partitionKey);
+            }
+
+            if (response.StatusCode == HttpStatusCode.Created)
+            {
+                await JS.InvokeVoidAsync("alert",
+                    $"Your registration was successful (GOOD LUCK!)");
+            }
+            else if (response.StatusCode == HttpStatusCode.OK)
+            {
+                await JS.InvokeVoidAsync("alert",
+                    $"Your registration data was updated.");
+            }
+            else
+            {
+                throw new Exception(
+                    $"Got unexpected status-code: {response.StatusCode}");
+            }
+
+            entrant.Email = null;
+            entrant.FirstName = null;
+            entrant.LastName = null;
+            entrant.WantsEmails = true;
+        }
+        catch (CosmosException error)
+        {
+            await JS.InvokeVoidAsync("alert",
+                CosmosHelper.GetErrorMessage(error.ResponseBody));
+        }
+        catch (Exception error)
+        {
+            var sb = new StringBuilder();
+
+            sb.Append("Please show this error to your host.  (Type:");
+            sb.Append(error.GetType());
+            sb.Append(", Message: ");
+            sb.Append(error.Message.ToSingleLine());
+            sb.Append(")");
+
+            await JS.InvokeVoidAsync("alert", sb.ToString());
+        }
+    }
+
+    private async Task<Data> GetDataOrNullAsync(string id, DateOnly date)
+    {
+        var query = $"SELECT TOP 1 * FROM c WHERE c.id = '{id}'";
+
+        var queryDefinition = new QueryDefinition(query);
+
+        var options = new QueryRequestOptions();
+
+        options.PartitionKey = new PartitionKey(date.ToDateString());
+
+        var queryResultSetIterator = container.GetItemQueryIterator<Data>(
+            queryDefinition, null, options);
+
+        while (queryResultSetIterator.HasMoreResults)
+        {
+            var currentResultSet = await queryResultSetIterator.ReadNextAsync();
+
+            foreach (Data data in currentResultSet)
+                return data;
+        }
+
+        return null!;
+    }
+}

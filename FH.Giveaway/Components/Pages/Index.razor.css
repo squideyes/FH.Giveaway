@@ -1,0 +1,82 @@
+﻿.headerStyle {
+    font-family: "Protest Guerrilla";
+    font-size: 8rem;
+    color: white;
+}
+
+.counterStyle {
+    font-family: "Protest Guerrilla";
+    font-weight: 400;
+    font-style: normal;
+    font-size: 20rem;
+    color: white;
+}
+
+.bgStyle {
+    background-color: #1550A7;
+    background-image: url('images/Rocket.png');
+    background-position: right bottom;
+    background-repeat: no-repeat;
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.nameStyle {
+    font-weight: 400;
+    font-style: normal;
+    font-size: 8rem;
+    color: white;
+}
+
+.theWinnerIsStyle {
+    font-weight: 400;
+    font-style: normal;
+    font-size: 4rem;
+    color: white;
+    line-height: 1.1;
+}
+
+.background-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    background-color: #1550A7;
+}
+
+.anchored-image {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    margin: 0;
+}
+
+.fade-in-text {
+    animation: fadeIn 5s;
+}
+
+.fade-out-text {
+    animation: fadeOut 5s;
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}

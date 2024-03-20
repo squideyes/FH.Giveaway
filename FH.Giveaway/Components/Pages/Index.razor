@@ -1,0 +1,142 @@
+﻿@page "/"
+@inject Container container
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<div class="vstack bgStyle">
+    <div class="text-center mt-5">
+        <h1 class="headerStyle">For Humanity Giveaway</h1>
+        <div>
+            <button class="btn btn-primary btn-lg mt-3"
+                    disabled="@buttonDisabled" @onclick="CountDownAsync">
+                Pick A Winner
+            </button>
+            &nbsp;
+            <button class="btn btn-primary btn-lg mt-3"
+                    disabled="@buttonDisabled" @onclick="BookGivenToWinnerAsync">
+                Book Was Given To Winner
+            </button>
+
+        </div>
+    </div>
+    <div class="d-flex flex-column align-items-center justify-content-center h-100">
+        @if (showCounter)
+        {
+            <div @ref="counter" class="fade-in-text counterStyle">@currentCount</div>
+        }
+        @if (winner != null)
+        {
+            <div class="fade-in-text theWinnerIsStyle">And the winner is...</div>
+            <div class="fade-in-text nameStyle">@winner.FullName</div>
+        }
+    </div>
+</div>
+
+@code {
+    private ElementReference counter;
+    private Random random = new();
+    private int start = 10;
+    private int currentCount = 10;
+    private bool showCounter = false;
+    private bool buttonDisabled = false;
+    private int delay = 1000;
+    private Data winner = null!;
+
+    [Inject]
+    public required ConfettiService ConfettiService { get; set; }
+
+    private async Task CountDownAsync()
+    {
+        var datas = await GetElligibleDatasAsync();
+
+        if(datas.Length == 0)
+        {
+            await JS.InvokeVoidAsync(
+                "alert", $"There are no more eligable winners.");
+
+            return;
+        }
+
+        winner = null!;
+        showCounter = true;
+        buttonDisabled = true;
+
+        var index = random.Next(0, datas.Length);
+
+        for (int i = start; i >= 0; i--)
+        {
+            currentCount = i;
+
+            StateHasChanged();
+
+            await Task.Delay(delay);
+
+            delay -= 75;
+        }
+
+        FireConfetti();
+
+        showCounter = false;
+        buttonDisabled = false;
+        delay = 1000;
+        currentCount = 10;
+
+        winner = datas[index];
+    }
+
+    private void FireConfetti()
+    {
+        ConfettiService.Activate(new());
+    }
+
+    private async Task BookGivenToWinnerAsync()
+    {
+
+        try
+        {
+            winner.Won = true;
+
+            await container.UpsertItemAsync(
+                winner, new PartitionKey(winner.Date.ToDateString()!));
+
+            await JS.InvokeVoidAsync(
+                "alert", $"A book was given to {winner.FullName}.");
+        }
+        catch (Exception error)
+        {
+            await JS.InvokeVoidAsync("alert",
+                $"A \"BookGivenToWinnerAsync\" error occurred (Error: {error.Message})");
+        }
+    }
+
+
+    private async Task<Data[]> GetElligibleDatasAsync()
+    {
+        var date = DateOnly.FromDateTime(DateTime.Now);
+
+        var dateString = date.ToDateString();
+
+        var query = $"SELECT * FROM c WHERE c.date = '{dateString}' AND c.won = false";
+
+        var queryDefinition = new QueryDefinition(query);
+
+        var options = new QueryRequestOptions();
+
+        options.PartitionKey = new PartitionKey(dateString);
+
+        var queryResultSetIterator = container.GetItemQueryIterator<Data>(
+            queryDefinition, null, options);
+
+        var datas = new List<Data>();
+
+        while (queryResultSetIterator.HasMoreResults)
+        {
+            var currentResultSet = await queryResultSetIterator.ReadNextAsync();
+
+            foreach (Data data in currentResultSet)
+                datas.Add(data);
+        }
+
+        return datas.ToArray();
+    }
+}
