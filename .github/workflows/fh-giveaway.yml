@@ -5,13 +5,13 @@ on:
     - master
 env:
   AZURE_WEBAPP_NAME: fh-giveaway
-  AZURE_WEBAPP_PACKAGE_PATH: FH.Giveaway/published
+  AZURE_WEBAPP_PACKAGE_PATH: FH.Giveaway\published
   CONFIGURATION: Release
   DOTNET_CORE_VERSION: 8.0.x
   WORKING_DIRECTORY: FH.Giveaway
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET SDK
@@ -32,7 +32,7 @@ jobs:
         name: webapp
         path: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: build
     steps:
     - name: Download artifact from build job
@@ -41,8 +41,8 @@ jobs:
         name: webapp
         path: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
     - name: Deploy to Azure WebApp
-      uses: azure/webapps-deploy@v3
+      uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
-        publish-profile: ${{ secrets.WEBAPP_PUBLISH_SECRET }}
+        publish-profile: ${{ secrets.fh_giveaway_848C }}
         package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
